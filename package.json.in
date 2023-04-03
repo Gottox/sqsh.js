@@ -1,0 +1,7 @@
+{
+  "name": "%PACKAGE_NAME%",
+  "version": "%VERSION%",
+  "description": "%DESCRIPTION%",
+  "author": "%AUTHOR%",
+  "license": "%LICENSE%"
+}

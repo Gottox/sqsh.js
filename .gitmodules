@@ -1,0 +1,3 @@
+[submodule "subproject/libsqsh"]
+	path = subprojects/libsqsh
+	url = git@github.com:Gottox/libsqsh.git

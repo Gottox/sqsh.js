@@ -1,0 +1,2 @@
+option('emsdk',  type : 'string', value: '../emsdk',
+	description: 'path to emsdk')
