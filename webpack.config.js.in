@@ -1,0 +1,10 @@
+module.exports = {
+  mode: '@WEBPACK_MODE@',
+  entry: './lib/lib.js',
+  output: {
+    filename: 'sqsh.js',
+    path: '@MESON_BUILD_ROOT@',
+    library: 'sqsh',
+    libraryTarget: 'commonjs2'
+  },
+};

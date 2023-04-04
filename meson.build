@@ -14,9 +14,11 @@ project(
 		'libsqsh:fuse=disabled',
 		'libsqsh:zstd=disabled', # broken
 
-		'libsqsh:lzma=enabled',
-		'libsqsh:zlib=enabled',
-		'libsqsh:lz4=enabled',
+		'libsqsh:lzma=disabled',
+		'libsqsh:zlib=disabled',
+		'libsqsh:lz4=disabled',
+
+		'lzma:threads=disabled',
 	],
 	version: '0.2.0',
 	meson_version: '>=0.57',
@@ -41,6 +43,12 @@ package_json = configure_file(
 	configuration: package_json_conf,
 )
 
+npm_install_target = custom_target('npm_install',
+	output : 'node_modules',
+	input : package_json,
+	command : [npm, 'install'],
+)
+
 libsqsh_proj = subproject('libsqsh')
 
 libsqsh = libsqsh_proj.get_variable('libsqsh_dependency')
@@ -53,3 +61,29 @@ emscripten = declare_dependency(
 )
 
 subdir('lib')
+
+webpack_config = configure_file(
+	input: [ 'webpack.config.js.in' ],
+	output: 'webpack.config.js',
+	configuration: {
+		'MESON_BUILD_ROOT': meson.current_build_dir(),
+		'WEBPACK_MODE': get_option('debug') ? 'development' : 'production'
+	},
+)
+
+sqsh_js = custom_target('sqsh.js',
+	input : tsc_target,
+	command : [
+		npm, 'run',
+		'webpack', '--', 'build',
+		'-c', webpack_config,
+	],
+	output : 'sqsh.js',
+	build_by_default: true
+)
+
+configure_file(
+	input: [ 'index.html.in' ],
+	output: 'index.html',
+	configuration: { },
+)

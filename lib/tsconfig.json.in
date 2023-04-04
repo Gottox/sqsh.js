@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "lib": ["es2022"],
+    "target": "es2022",
+    "module": "es2022",
+    "baseUrl": "@MESON_BUILD_DIR@"
+  },
+  "files": [@SQSH_JS_SOURCES@]
+}

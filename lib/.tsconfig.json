@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "strict": true,
+    "lib": ["es2022"],
+    "target": "es2022",
+    "module": "es2022",
+    "baseUrl": "."
+  },
+  "include": ["./**/*.ts"]
+}
