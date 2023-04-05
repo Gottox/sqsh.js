@@ -28,63 +28,40 @@
 
 /**
  * @author       Enno Boland (mail@eboland.de)
- * @file         archive.c
+ * @file         error.c
  */
 
+#include "emscripten/em_macros.h"
 #include <emscripten.h>
 #include <sqsh_archive.h>
 #include <sqsh_mapper.h>
 #include <stdlib.h>
 #include <string.h>
 
-extern const struct SqshMemoryMapperImpl *const sqsh_mapper_impl_fetch;
+struct SqshErrorHandler {
+	int rv;
+};
+
+EMSCRIPTEN_KEEPALIVE struct SqshErrorHandler *
+sqshjs_error_handler_new(void) {
+	return calloc(1, sizeof(struct SqshErrorHandler));
+}
 
 EMSCRIPTEN_KEEPALIVE
-struct SqshConfig *
-sqshjs_config_new(void) {
-	struct SqshConfig *config = calloc(1, sizeof(struct SqshConfig));
-	if (config == NULL) {
-		return NULL;
-	}
-	return config;
+int *
+sqshjs_error_handler_rv_addr(struct SqshErrorHandler *error_handler) {
+	return &error_handler->rv;
 }
 
 EMSCRIPTEN_KEEPALIVE
 int
-sqshjs_config_set_source_mapper(struct SqshConfig *config, char *mapper) {
-#define OPTION(o) \
-	if (strcmp(#o, mapper) == 0) { \
-		config->source_mapper = sqsh_mapper_impl_ ## o; \
-		return 0; \
-	}
-	OPTION(static);
-	OPTION(mmap);
-	OPTION(fetch);
-
-	return -1;
-#undef OPTION
+sqshjs_error_handler_rv(struct SqshErrorHandler *error_handler) {
+	return error_handler->rv;
 }
 
 EMSCRIPTEN_KEEPALIVE
 int
-sqshjs_config_set(struct SqshConfig *config, char *name, uintptr_t value) {
-#define OPTION(c, o) \
-	if (strcmp(name, #o) == 0) { \
-		config->o = (c)value; \
-		return 0; \
-	}
-
-	OPTION(void *, source_mapper)
-	OPTION(int, mapper_lru_size)
-	OPTION(int, mapper_block_size)
-	OPTION(int, compression_lru_size)
-
-	return -1;
-#undef OPTION
-}
-
-EMSCRIPTEN_KEEPALIVE
-void
-sqshjs_config_free(struct SqshConfig *config) {
-	free(config);
+sqshjs_error_handler_free(struct SqshErrorHandler *error_handler) {
+	free(error_handler);
+	return 0;
 }

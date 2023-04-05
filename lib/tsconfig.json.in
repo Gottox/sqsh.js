@@ -1,10 +1,11 @@
 {
   "compilerOptions": {
-    "strict": true,
     "lib": ["es2022"],
     "target": "es2022",
     "module": "es2022",
-    "baseUrl": "@MESON_BUILD_DIR@"
+    "baseUrl": "@MESON_BUILD_DIR@",
+    "moduleResolution": "nodenext",
+	"allowSyntheticDefaultImports": true
   },
   "files": [@SQSH_JS_SOURCES@]
 }

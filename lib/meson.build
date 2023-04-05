@@ -10,16 +10,23 @@ exported_functions = [
 	'_sqsh_archive_metablock_extractor',
 	'_sqsh_archive_map_manager',
 	'_sqsh_archive_free',
+	'_sqsh_error_str',
 ]
 
 sqsh_js_sources_c = [
 	'mapper.c',
 	'archive.c',
+	'error.c'
 ]
 
 sqsh_js_sources_ts = [
-	'archive.ts',
-	'lib.ts',
+	'index.d.ts',
+	'libsqshjs.d.ts',
+	'base.mts',
+	'types.mts',
+	'archive.mts',
+	'lib.mts',
+	'error.mts',
 ]
 
 sqsh_js_dependencies = [
@@ -33,10 +40,10 @@ foreach source: sqsh_js_sources_ts
 	configure_file(
 		input: source,
 		output: source,
-		configuration: {},
+		copy: true,
 	)
 	sqsh_js_build_sources_ts += '"' + source + '"' 
-	sqsh_js_build_targets_js += source.split('.')[0] + '.js'
+	sqsh_js_build_targets_js += source.split('.')[0] + '.mjs'
 endforeach
 
 tsconfig_conf = configuration_data({
@@ -50,13 +57,47 @@ tsconfig = configure_file(
 	configuration: tsconfig_conf,
 )
 
-sqsh_js_link_args = [
-	'-sEXPORTED_FUNCTIONS=' + ','.join(exported_functions),
-	'-sEXPORTED_RUNTIME_METHODS=ccall,cwrap',
+sqsh_js_c_args = [
 ]
 
+sqsh_js_link_args = [
+	'-sMODULARIZE',
+	'-sEXPORT_NAME=load',
+	'-sENVIRONMENT=web',
+	'-sFILESYSTEM=0',
+	'-sASYNCIFY',
+	'-sASYNCIFY_ADVISE=1',
+	'-sEXPORTED_FUNCTIONS=' + ','.join(exported_functions),
+	'-sEXPORTED_RUNTIME_METHODS=cwrap',
+]
+
+if get_option('debug')
+	sqsh_js_link_args += [
+		'-gsource-map',
+		'-sSAFE_HEAP=1',
+		'-sSTACK_OVERFLOW_CHECK=1',
+	]
+	sqsh_js_c_args += [
+		'-gsource-map'
+	]
+	# Hack to make source maps work
+	foreach source : sqsh_js_sources_c
+		configure_file(
+			input: source,
+			output: source,
+			copy: true
+		)
+	endforeach
+endif
+
+libsqshjs = executable('libsqshjs', sqsh_js_sources_c,
+	dependencies: [ sqsh_js_dependencies ],
+	link_args: sqsh_js_link_args,
+	c_args: sqsh_js_c_args
+)
+
 tsc_target = custom_target('tsc',
-	input : [ npm_install_target, sqsh_js_sources_ts, tsconfig ],
+	input : [ npm_install_target, sqsh_js_sources_ts, tsconfig, libsqshjs ],
 	command : [
 		npm, 'run',
 		'tsc', '--',
@@ -65,9 +106,4 @@ tsc_target = custom_target('tsc',
 	],
 	output : sqsh_js_build_targets_js,
 	build_by_default: true
-)
-
-executable('sqsh_wasm', sqsh_js_sources_c,
-	dependencies: [ sqsh_js_dependencies ],
-	link_args: sqsh_js_link_args
 )

@@ -28,7 +28,7 @@
 
 /**
  * @author       Enno Boland (mail@eboland.de)
- * @file         fetch_mapper.c
+ * @file         mapper.c
  */
 
 #include <sqsh_mapper_private.h>
@@ -38,34 +38,104 @@
 #include <sqsh_error.h>
 
 /* clang-format off */
-EM_JS(int, fetch_page,
-		(const char *url, int range_begin, int range_end), {
-	return Asyncify.handleSleep(async function(wakeUp) {
-		const request = new Request(url, {
-			method: 'GET',
-			headers: {
-				"Content-Range": "bytes " + range_begin + "-" + range_end + "/*"
-			}
-		});
-		const response = await fetch(url);
-		wakeUp(text);
-	});
+EM_ASYNC_JS(int, fetch_download,
+		(const char *url, int offset, uint8_t *data, size_t size), {
+	url = UTF8ToString(url);
+	const range_regex = new RegExp("^bytes ([0-9]+)-([0-9]+)/([0-9]+)$");
+	const end_offset = offset + size - 1;
+	const req_opt = {
+		method: 'GET',
+		headers: {
+			"Content-Range": "bytes=" + offset + "-" + end_offset,
+			"Accept-Encoding": "identity"
+		}
+	};
+	try {
+		const res = await fetch(url, req_opt);
+		const content_range = range_regex.exec(res.headers.get("Content-Range"));
+		if (!content_range || Number(content_range[1]) !== offset) {
+			return -1;
+		}
+		const file_size = Number(content_range[3]);
+		const res_data = new Uint8Array(await res.arrayBuffer());
+		const target = HEAPU8.subarray(data, data + size);
+		
+		target.set(res_data);
+		return file_size;
+	} catch(e) {
+		console.log(e);
+		return -1;
+	}
 })
 /* clang-format on */
 
 static int
 sqsh_mapper_fetch_init(
 		struct SqshMapper *mapper, const void *input, size_t *size) {
-	(void)mapper;
-	(void)input;
 	(void)size;
-	return 0;
+	int rv = 0;
+
+	const char *url = input;
+	mapper->data.cl.url = url;
+
+	const size_t block_size = sqsh__mapper_block_size(mapper);
+
+	uint8_t *header = calloc(block_size, sizeof(uint8_t));
+	if (header == NULL) {
+		rv = -SQSH_ERROR_MAPPER_INIT;
+		goto out;
+	}
+	mapper->data.cl.header_cache = header;
+	rv = fetch_download(url, 0, header, block_size);
+	if (rv < 0) {
+		goto out;
+	}
+	*size = rv;
+	rv = 0;
+
+out:
+	return rv;
 }
 
 static int
 sqsh_mapper_fetch_map(struct SqshMapSlice *mapping) {
-	(void)mapping;
-	return 0;
+	const sqsh_index_t offset = mapping->offset;
+	const size_t size = mapping->size;
+	int rv = 0;
+	uint64_t file_size = 0;
+	uint64_t file_time = 0;
+
+	const char *url = mapping->mapper->data.cl.url;
+	if (offset == 0 && mapping->mapper->data.cl.header_cache != NULL) {
+		mapping->data = mapping->mapper->data.cl.header_cache;
+		mapping->mapper->data.cl.header_cache = NULL;
+	} else {
+		uint8_t *data = calloc(size, sizeof(uint8_t));
+		rv = fetch_download(
+				url, offset, data, file_size);
+		if (rv < 0) {
+			goto out;
+		}
+		mapping->data = data;
+		file_size = rv;
+		rv = 0;
+
+		if (file_time != mapping->mapper->data.cl.expected_time) {
+			rv = -SQSH_ERROR_MAPPER_MAP;
+			goto out;
+		}
+
+		if (file_size != sqsh__mapper_size(mapping->mapper)) {
+			rv = -SQSH_ERROR_MAPPER_MAP;
+			goto out;
+		}
+	}
+
+out:
+	if (rv < 0) {
+		sqsh__map_slice_cleanup(mapping);
+	}
+	return rv;
 }
 
 static int
@@ -76,14 +146,13 @@ sqsh_mapper_fetch_cleanup(struct SqshMapper *mapper) {
 
 static int
 sqsh_mapping_fetch_unmap(struct SqshMapSlice *mapping) {
-	(void)mapping;
+	free(mapping->data);
 	return 0;
 }
 
 static const uint8_t *
 sqsh_mapping_fetch_data(const struct SqshMapSlice *mapping) {
-	(void)mapping;
-	return 0;
+	return mapping->data;
 }
 
 static const struct SqshMemoryMapperImpl impl = {

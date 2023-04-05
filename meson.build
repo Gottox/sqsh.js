@@ -15,7 +15,7 @@ project(
 		'libsqsh:zstd=disabled', # broken
 
 		'libsqsh:lzma=disabled',
-		'libsqsh:zlib=disabled',
+		'libsqsh:zlib=enabled',
 		'libsqsh:lz4=disabled',
 
 		'lzma:threads=disabled',
@@ -72,7 +72,7 @@ webpack_config = configure_file(
 )
 
 sqsh_js = custom_target('sqsh.js',
-	input : tsc_target,
+	input : [ tsc_target, libsqshjs ],
 	command : [
 		npm, 'run',
 		'webpack', '--', 'build',
